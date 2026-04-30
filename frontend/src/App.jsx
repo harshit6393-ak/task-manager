@@ -3,7 +3,7 @@ import axios from 'axios';
 import './App.css';
 
 // This connects to your Python backend!
-const API_URL = 'http://127.0.0.1:5000/api';
+const API_URL = 'task-manager-production-410c.up.railway.app';
 
 function App() {
   const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')));
