@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './App.css';
 
-// This connects to your Python backend!
-const API_URL = 'task-manager-production-4aca.up.railway.app';
+// FIXED: Points to your BACKEND (-610f) with the https:// protocol
+const API_URL = 'https://task-manager-production-610f.up.railway.app';
 
 function App() {
   const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')));
@@ -27,25 +27,29 @@ function App() {
 
   const fetchData = async () => {
     try {
-      const statsRes = await axios.get(`${API_URL}/dashboard`, getAuthHeaders());
+      // Added /api/ prefix if your backend uses it (standard practice)
+      // If your backend routes are just /dashboard, remove the /api
+      const statsRes = await axios.get(`${API_URL}/api/dashboard`, getAuthHeaders());
       setStats(statsRes.data);
-      const tasksRes = await axios.get(`${API_URL}/tasks`, getAuthHeaders());
+      const tasksRes = await axios.get(`${API_URL}/api/tasks`, getAuthHeaders());
       setTasks(tasksRes.data);
     } catch (err) {
-      console.error(err);
-      handleLogout();
+      console.error("Data fetch error:", err);
+      // Only logout if the error is an 401 (unauthorized)
+      if (err.response && err.response.status === 401) handleLogout();
     }
   };
 
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post(`${API_URL}/login`, { email, password });
+      const res = await axios.post(`${API_URL}/api/login`, { email, password });
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('user', JSON.stringify(res.data.user));
       setToken(res.data.token);
       setUser(res.data.user);
     } catch (err) {
+      console.error("Login error:", err);
       alert('Login Failed: Check your email and password');
     }
   };
@@ -53,12 +57,12 @@ function App() {
   const handleRegister = async (e) => {
     e.preventDefault();
     try {
-      // Automatically making the first user an Admin for your assignment
-      await axios.post(`${API_URL}/register`, { name, email, password, role: 'Admin' });
+      await axios.post(`${API_URL}/api/register`, { name, email, password, role: 'Admin' });
       alert('Registration successful! Please login now.');
       setIsRegistering(false);
     } catch (err) {
-      alert('Registration Failed. Email might already be in use.');
+      console.error("Registration error:", err);
+      alert('Registration Failed. Email might already be in use or server is down.');
     }
   };
 
@@ -69,8 +73,12 @@ function App() {
   };
 
   const updateTaskStatus = async (id, newStatus) => {
-    await axios.put(`${API_URL}/tasks/${id}/status`, { status: newStatus }, getAuthHeaders());
-    fetchData(); // Refresh data
+    try {
+      await axios.put(`${API_URL}/api/tasks/${id}/status`, { status: newStatus }, getAuthHeaders());
+      fetchData(); 
+    } catch (err) {
+      console.error("Status update error:", err);
+    }
   };
 
   // IF NOT LOGGED IN, SHOW LOGIN/REGISTER PAGE
@@ -103,7 +111,7 @@ function App() {
   return (
     <div className="dashboard-container" style={{ padding: '20px' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #ccc', paddingBottom: '10px' }}>
-        <h1>Welcome, {user.name} ({user.role})</h1>
+        <h1>Welcome, {user?.name} ({user?.role})</h1>
         <button onClick={handleLogout} style={{ height: '40px', cursor: 'pointer' }}>Logout</button>
       </header>
 
@@ -129,14 +137,14 @@ function App() {
               <tr><td colSpan="4" style={{ padding: '10px', textAlign: 'center' }}>No tasks found! You need to add some via the backend.</td></tr>
             ) : (
               tasks.map(task => (
-                <tr key={task.id}>
+                <tr key={task.id || task._id}>
                   <td style={{ padding: '10px', border: '1px solid #ddd' }}>{task.title}</td>
                   <td style={{ padding: '10px', border: '1px solid #ddd' }}>{task.projectId?.name || 'N/A'}</td>
                   <td style={{ padding: '10px', border: '1px solid #ddd' }}>{task.status}</td>
                   <td style={{ padding: '10px', border: '1px solid #ddd' }}>
                     <select 
                       value={task.status} 
-                      onChange={(e) => updateTaskStatus(task.id, e.target.value)}
+                      onChange={(e) => updateTaskStatus(task.id || task._id, e.target.value)}
                     >
                       <option value="Todo">Todo</option>
                       <option value="In-Progress">In-Progress</option>
